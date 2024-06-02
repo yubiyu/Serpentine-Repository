@@ -1,0 +1,651 @@
+#include "game.h"
+
+bool Game::exit;
+bool Game::redraw;
+
+void Game::MainLoop()
+{
+    while(!exit)
+    {
+        al_wait_for_event(Event::eventQueue, &Event::event);
+
+        if(Event::event.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+            exit = true;
+
+        if(Event::event.type == ALLEGRO_EVENT_KEY_DOWN)
+            Keyboard::InputKeydown();
+
+        if(Event::event.type == ALLEGRO_EVENT_KEY_UP)
+            Keyboard::InputKeyup();
+
+        if(Event::event.type == ALLEGRO_EVENT_MOUSE_ENTER_DISPLAY)
+        {
+
+        }
+
+        if(Event::event.type == ALLEGRO_EVENT_MOUSE_LEAVE_DISPLAY)
+        {
+
+        }
+
+        if(Event::event.type == ALLEGRO_EVENT_MOUSE_AXES)
+        {
+            Mouse::InputMouseXY();
+            Mouse::InputMousewheel();
+        }
+
+        if(Event::event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN)
+            Mouse::InputMouseDown();
+
+        if(Event::event.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP)
+            Mouse::InputMouseUp();
+
+
+        if(Event::event.type == ALLEGRO_EVENT_TIMER)
+        {
+            redraw = true;
+
+            InputSwitchboard();
+            LogicSwitchboard();
+
+            Mouse::mouseAxesAltered = false;
+        }
+
+        if(redraw && al_is_event_queue_empty(Event::eventQueue))
+        {
+            DrawingSwitchboard();
+        }
+    }
+}
+
+bool Game::Initialize(char **argv)
+{
+    exit = false;
+    redraw = true;
+
+    srand(time(NULL));
+
+    al_install_system(ALLEGRO_VERSION_INT,NULL);
+    al_install_keyboard();
+    al_install_mouse();
+    al_init_image_addon();
+    al_init_primitives_addon();
+    al_install_audio();
+    al_init_acodec_addon();
+    al_init_font_addon();
+    al_init_ttf_addon();
+
+    Display::display = al_create_display(Display::WIDTH, Display::HEIGHT);
+    Time::FPSTimer = al_create_timer(1.0/Time::FPS);
+    Event::eventQueue = al_create_event_queue();
+
+    al_register_event_source(Event::eventQueue, al_get_display_event_source(Display::display));
+    al_register_event_source(Event::eventQueue, al_get_timer_event_source(Time::FPSTimer));
+    al_register_event_source(Event::eventQueue, al_get_keyboard_event_source());
+    al_register_event_source(Event::eventQueue, al_get_mouse_event_source());
+
+    if(!Resource::Initialize(argv))
+    {
+        assert("Resource : Initialization failed");
+        return false;
+    }
+
+    Palette::Initialize();
+    Scene::Initialize();
+
+    Camera::Initialize();
+    Camera::SetCell(0, 0);
+    Camera::WarpToDestination();
+
+    al_start_timer(Time::FPSTimer);
+
+    Serpent::Initialize();
+    Star::GenerateStarfield();
+    Space::Initialize();
+    UpgradeMenu::Initialize();
+
+    al_set_sample_instance_playmode(Resource::starryWalkSampleInstance, ALLEGRO_PLAYMODE_LOOP);
+    al_play_sample_instance(Resource::starryWalkSampleInstance);
+
+    return true;
+}
+
+void Game::Uninitialize()
+{
+
+    for(std::vector<Graviton*>::iterator it = Graviton::streamA.begin(); it != Graviton::streamA.end();)
+    {
+        delete *it;
+        Graviton::streamA.erase(it);
+    }
+    for(std::vector<Graviton*>::iterator it = Graviton::streamB.begin(); it != Graviton::streamB.end();)
+    {
+        delete *it;
+        Graviton::streamB.erase(it);
+    }
+
+    for(std::vector<Star*>::iterator it = Star::foregroundStarfield.begin(); it != Star::foregroundStarfield.end();)
+    {
+        delete *it;
+        Star::foregroundStarfield.erase(it);
+    }
+    for(std::vector<Star*>::iterator it = Star::centralStarfield.begin(); it != Star::centralStarfield.end();)
+    {
+        delete *it;
+        Star::centralStarfield.erase(it);
+    }
+    for(std::vector<Star*>::iterator it = Star::backgroundStarfield.begin(); it != Star::backgroundStarfield.end();)
+    {
+        delete *it;
+        Star::backgroundStarfield.erase(it);
+    }
+    for(std::vector<Star*>::iterator it = Star::farBackgroundStarfield.begin(); it != Star::farBackgroundStarfield.end();)
+    {
+        delete *it;
+        Star::farBackgroundStarfield.erase(it);
+    }
+
+    Serpent::Uninitialize();
+
+    Camera::Uninitialize();
+    Resource::Uninitialize();
+
+    al_uninstall_audio();
+    al_destroy_display(Display::display);
+    al_destroy_timer(Time::FPSTimer);
+    al_destroy_event_queue(Event::eventQueue);
+    al_uninstall_system();
+
+}
+
+
+void Game::InputSwitchboard()
+{
+    Keyboard::InputKeyHold();
+    Mouse::InputMouseButtonHold();
+
+    switch(Scene::inputContext)
+    {
+    case Scene::INPUT_CONTEXT_TESTING:
+        TestingInput();
+        break;
+    case Scene::INPUT_CONTEXT_TITLE:
+        TitleInput();
+        break;
+    case Scene::INPUT_CONTEXT_SETTINGS:
+        SettingsInput();
+        break;
+    case Scene::INPUT_CONTEXT_OVERWORLD:
+        OverworldInput();
+        break;
+    }
+}
+
+void Game::TestingInput()
+{
+    if(Mouse::mousewheelInput[Mouse::MOUSEWHEEL_UP])
+    {
+        al_set_mouse_z(0);
+    }
+    else if(Mouse::mousewheelInput[Mouse::MOUSEWHEEL_DOWN])
+    {
+        al_set_mouse_z(0);
+    }
+    else if(Mouse::mouseInput[Mouse::MOUSE_MIDDLE])
+    {
+
+    }
+
+    if(Mouse::mouseButtonHoldTicks[Mouse::MOUSE_LEFT] == 1)
+    {
+
+    }
+
+    if(Keyboard::keyHoldTicks[Keyboard::KEY_LEFT] >= 1)
+    {
+        Camera::xPosition -= 4;
+    }
+    if(Keyboard::keyHoldTicks[Keyboard::KEY_RIGHT] >= 1)
+    {
+        Camera::xPosition += 4;
+    }
+    if(Keyboard::keyHoldTicks[Keyboard::KEY_UP] >= 1)
+    {
+        Camera::yPosition -= 4;
+    }
+    if(Keyboard::keyHoldTicks[Keyboard::KEY_DOWN] >= 1)
+    {
+        Camera::yPosition += 4;
+    }
+
+    if(Keyboard::keyHoldTicks[Keyboard::KEY_J] == 1)
+    {
+        al_play_sample_instance(Resource::genericLaserShootSampleInstance);
+    }
+
+    if(Keyboard::keyHoldTicks[Keyboard::KEY_K] == 1)
+    {
+        if(al_get_sample_instance_playing(Resource::genericBgmSampleInstance))
+            al_stop_sample_instance(Resource::genericBgmSampleInstance);
+        else
+        {
+            al_set_sample_instance_playmode(Resource::genericBgmSampleInstance, ALLEGRO_PLAYMODE_LOOP);
+            al_play_sample_instance(Resource::genericBgmSampleInstance);
+        }
+    }
+
+    if(Keyboard::keyHoldTicks[Keyboard::KEY_ENTER] == 1)
+    {
+        Scene::ChangeScene(Scene::SCENE_TITLE);
+    }
+}
+
+void Game::TitleInput()
+{
+
+}
+
+void Game::SettingsInput()
+{
+
+}
+
+void Game::OverworldInput()
+{
+    if(Mouse::mouseButtonHoldTicks[Mouse::MOUSE_LEFT] == 1)
+    {
+        int segmentIndex = 0;
+        bool segmentFound = false;
+        bool menuButtonFound = false;
+        for(std::vector<Segment*>::iterator it = Serpent::segments.begin(); it != Serpent::segments.end(); ++it)
+        {
+            if(UpgradeMenu::segmentSelected)
+            {
+                if(Mouse::mouseDisplayY > UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET-8 &&
+                        Mouse::mouseDisplayY < UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET+40)
+                {
+                    if(Mouse::mouseDisplayX > UpgradeMenu::xPosition + UpgradeMenu::PROPULSION_BUTTON_X_OFFSET-8 &&
+                            Mouse::mouseDisplayX < UpgradeMenu::xPosition + UpgradeMenu::PROPULSION_BUTTON_X_OFFSET+40)
+                    {
+                        LeftClickOnButton(UpgradeMenu::MENU_BUTTON_PROPULSION);
+                        menuButtonFound = true;
+                        break;
+                    }
+                    else if(Mouse::mouseDisplayX > UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET-8 &&
+                            Mouse::mouseDisplayX < UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET+40)
+                    {
+                        LeftClickOnButton(UpgradeMenu::MENU_BUTTON_REPAIR);
+                        menuButtonFound = true;
+                        break;
+                    }
+                    else if(Mouse::mouseDisplayX > UpgradeMenu::xPosition + UpgradeMenu::ALERTNESS_BUTTON_X_OFFSET-8 &&
+                            Mouse::mouseDisplayX < UpgradeMenu::xPosition + UpgradeMenu::ALERTNESS_BUTTON_X_OFFSET+40)
+                    {
+                        LeftClickOnButton(UpgradeMenu::MENU_BUTTON_ALERTNESS);
+                        menuButtonFound = true;
+                        break;
+                    }
+                }
+
+            }
+
+            if(!menuButtonFound)
+            {
+                if(Mouse::mouseDisplayX > (*it)->xPosition-32 && Mouse::mouseDisplayX < (*it)->xPosition+32
+                        && Mouse::mouseDisplayY > (*it)->yPosition-32 && Mouse::mouseDisplayY < (*it)->yPosition+32)
+                {
+                    std::cout << "Test: Segment " << segmentIndex << " clicked." << std::endl;
+                    LeftClickOnSegment(*it);
+                    segmentFound = true;
+                    break;
+                }
+
+            }
+            segmentIndex++;
+        }
+
+        if(!menuButtonFound && !segmentFound)
+        {
+            LeftClickOnSegment(nullptr);
+        }
+    }
+}
+
+void Game::LogicSwitchboard()
+{
+    switch(Scene::scene)
+    {
+    case Scene::SCENE_TESTING_NOSCENE:
+        TestingNosceneLogic();
+        break;
+    case Scene::SCENE_TITLE:
+        TitleSceneLogic();
+        break;
+    case Scene::SCENE_SETTINGS:
+        SettingsSceneLogic();
+        break;
+    case Scene::SCENE_OVERWORLD:
+        OverworldSceneLogic();
+        break;
+    }
+}
+
+void Game::TestingNosceneLogic()
+{
+
+}
+
+void Game::TitleSceneLogic()
+{
+
+}
+
+void Game::SettingsSceneLogic()
+{
+
+}
+
+void Game::OverworldSceneLogic()
+{
+    Space::Update();
+    Serpent::Update();
+    UpgradeMenu::Update();
+
+    for(std::vector<Star*>::iterator it = Star::farBackgroundStarfield.begin(); it != Star::farBackgroundStarfield.end(); ++it)
+    {
+        (*it)->xPosition -= 0.125;
+        (*it)->yPosition -= Serpent::pathYMod[0]/2056;
+        (*it)->Update();
+    }
+    for(std::vector<Star*>::iterator it = Star::backgroundStarfield.begin(); it != Star::backgroundStarfield.end(); ++it)
+    {
+        (*it)->xPosition -= 1.0;
+        (*it)->yPosition -= Serpent::pathYMod[0]/256;
+        (*it)->Update();
+    }
+    for(std::vector<Star*>::iterator it = Star::centralStarfield.begin(); it != Star::centralStarfield.end(); ++it)
+    {
+        (*it)->xPosition -= 2.0;
+        (*it)->yPosition -= Serpent::pathYMod[0]/128;
+        (*it)->Update();
+    }
+    for(std::vector<Star*>::iterator it = Star::foregroundStarfield.begin(); it != Star::foregroundStarfield.end(); ++it)
+    {
+        (*it)->xPosition -= 5.0;
+        (*it)->yPosition -= Serpent::pathYMod[0]/24;
+        (*it)->Update();
+    }
+
+
+    for(std::vector<Graviton*>::iterator it = Graviton::streamA.begin(); it != Graviton::streamA.end();)
+    {
+        (*it)->Update();
+        if(! (*it)->alive)
+        {
+            delete *it;
+            Graviton::streamA.erase(it);
+        }
+        else
+            ++it;
+    }
+    for(std::vector<Graviton*>::iterator it = Graviton::streamB.begin(); it != Graviton::streamB.end();)
+    {
+        (*it)->Update();
+        if(! (*it)->alive)
+        {
+            delete *it;
+            Graviton::streamB.erase(it);
+        }
+        else
+            ++it;
+    }
+}
+
+void Game::DrawingSwitchboard()
+{
+    Game::redraw = false;
+
+    switch(Scene::scene)
+    {
+    case Scene::SCENE_TESTING_NOSCENE:
+        al_clear_to_color(COLKEY_BACKGROUND);
+        TestingNosceneDrawing();
+        break;
+    case Scene::SCENE_TITLE:
+        TitleSceneDrawing();
+        break;
+    case Scene::SCENE_SETTINGS:
+        SettingsSceneDrawing();
+        break;
+    case Scene::SCENE_OVERWORLD:
+        al_clear_to_color(al_map_rgb(Space::rComponent, Space::gComponent, Space::bComponent));
+        OverworldSceneDrawing();
+        break;
+    }
+
+    al_flip_display();
+}
+
+void Game::TestingNosceneDrawing()
+{
+    DrawDebugGrid();
+    DrawDebugGridCameraCrosshair();
+    DrawDebugGridText();
+
+    al_draw_multiline_text(Resource::builtin8, COLKEY_TEXT_LIGHT, Display::WIDTH, 0, 600, 16, ALLEGRO_ALIGN_RIGHT,
+                           "<Enter> to proceed to title.\n<UDLR> to test camera.\n<J> to test SFX.\n<K> to toggle test BGM.");
+}
+
+void Game::TitleSceneDrawing()
+{
+
+}
+
+void Game::SettingsSceneDrawing()
+{
+
+}
+
+void Game::OverworldSceneDrawing()
+{
+    for(std::vector<Star*>::iterator it = Star::farBackgroundStarfield.begin(); it != Star::farBackgroundStarfield.end(); ++it)
+        al_draw_bitmap(Resource::farBackgroundStarPng[(*it)->variant], (*it)->xPosition, (*it)->yPosition, 0);
+    for(std::vector<Star*>::iterator it = Star::backgroundStarfield.begin(); it != Star::backgroundStarfield.end(); ++it)
+        al_draw_bitmap(Resource::backgroundStarPng[(*it)->variant], (*it)->xPosition, (*it)->yPosition, 0);
+    for(std::vector<Star*>::iterator it = Star::centralStarfield.begin(); it != Star::centralStarfield.end(); ++it)
+        al_draw_bitmap(Resource::centralStarPng[(*it)->variant], (*it)->xPosition, (*it)->yPosition, 0);
+
+    for(std::vector<Graviton*>::iterator it = Graviton::streamB.begin(); it != Graviton::streamB.end(); ++it)
+    {
+        al_draw_bitmap(Resource::gravitonPng, (*it)->xPosition, (*it)->yPosition, 0);
+    }
+
+    int segmentPosition = 0;
+    for(std::vector<Segment*>::reverse_iterator it = Serpent::segments.rbegin(); it != Serpent::segments.rend(); ++it)
+    {
+        al_draw_rotated_bitmap(Resource::serpentSegmentPng[(*it)->classification], 32, 32,
+                               (*it)->xPosition, (*it)->yPosition,
+                               (*it)->rotationAngle,
+                               0);
+
+        segmentPosition++;
+    }
+
+    int energyPerLight = Serpent::maxEnergy / Serpent::totalLights;
+    int energyCounted = 0;
+    for(std::vector<Segment*>::iterator it = Serpent::segments.begin(); it != Serpent::segments.end(); ++it)
+    {
+        if((*it)->numLights > 0)
+        {
+            int segmentLightLevel = 0;
+            for(int i = 0; i < (*it)->numLights; i++)
+            {
+                energyCounted += energyPerLight;
+                if(Serpent::currentEnergy > energyCounted)
+                    segmentLightLevel ++;
+            }
+
+            if(segmentLightLevel > 0)
+            {
+                if((*it)->classification == Segment::SEGMENT_CLASS_KEY)
+                    al_draw_rotated_bitmap(Resource::serpentKeyLightsPng[segmentLightLevel-1], 32, 32,
+                                           (*it)->xPosition, (*it)->yPosition,
+                                           (*it)->rotationAngle,
+                                           0);
+                else if((*it)->classification == Segment::SEGMENT_CLASS_GENERIC)
+                    al_draw_rotated_bitmap(Resource::serpentGenericLightsPng[segmentLightLevel-1], 32, 32,
+                                           (*it)->xPosition, (*it)->yPosition,
+                                           (*it)->rotationAngle,
+                                           0);
+            }
+
+        }
+    }
+
+    for(std::vector<Graviton*>::iterator it = Graviton::streamA.begin(); it != Graviton::streamA.end(); ++it)
+    {
+        al_draw_bitmap(Resource::gravitonPng, (*it)->xPosition, (*it)->yPosition, 0);
+    }
+
+    for(std::vector<Star*>::iterator it = Star::foregroundStarfield.begin(); it != Star::foregroundStarfield.end(); ++it)
+        al_draw_tinted_bitmap(Resource::foregroundStarPng[(*it)->variant], al_map_rgba_f(1.0,1.0,1.0,0.5), (*it)->xPosition, (*it)->yPosition, 0);
+
+    if(UpgradeMenu::segmentSelected)
+    {
+        al_draw_tinted_rotated_bitmap(Resource::selectorCirclePng, al_map_rgba_f(1.0,1.0,1.0,0.1),
+                                      64, 64,
+                                      UpgradeMenu::xPosition,
+                                      UpgradeMenu::yPosition,
+                                      UpgradeMenu::selectorCircleRotation,
+                                      0);
+
+        if(UpgradeMenu::whichSegment->repairFunctionActive)
+            al_draw_tinted_bitmap(Resource::repairButtonPng[1], al_map_rgba_f(1.0,1.0,1.0,0.8),
+                                  UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET,
+                                  UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
+                                  0);
+        else
+            al_draw_tinted_bitmap(Resource::repairButtonPng[0], al_map_rgba_f(1.0,1.0,1.0,0.8),
+                                  UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET,
+                                  UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
+                                  0);
+
+        if(UpgradeMenu::whichSegment->hasPropulsionFunction)
+        {
+            if(UpgradeMenu::whichSegment->propulsionFunctionActive)
+                al_draw_tinted_bitmap(Resource::propulsionButtonPng[1], al_map_rgba_f(1.0,1.0,1.0,0.8),
+                                      UpgradeMenu::xPosition + UpgradeMenu::PROPULSION_BUTTON_X_OFFSET,
+                                      UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
+                                      0);
+            else
+                al_draw_tinted_bitmap(Resource::propulsionButtonPng[0], al_map_rgba_f(1.0,1.0,1.0,0.8),
+                                      UpgradeMenu::xPosition + UpgradeMenu::PROPULSION_BUTTON_X_OFFSET,
+                                      UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
+                                      0);
+        }
+        if(UpgradeMenu::whichSegment->hasAlertnessFunction)
+        {
+            if(UpgradeMenu::whichSegment->alertnessFunctionActive)
+                al_draw_tinted_bitmap(Resource::alertnessButtonPng[1], al_map_rgba_f(1.0,1.0,1.0,0.8),
+                                      UpgradeMenu::xPosition + UpgradeMenu::ALERTNESS_BUTTON_X_OFFSET,
+                                      UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
+                                      0);
+            else
+                al_draw_tinted_bitmap(Resource::alertnessButtonPng[0], al_map_rgba_f(1.0,1.0,1.0,0.8),
+                                      UpgradeMenu::xPosition + UpgradeMenu::ALERTNESS_BUTTON_X_OFFSET,
+                                      UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
+                                      0);
+        }
+    }
+
+
+
+    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::LIFE_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Life: " + std::to_string((int)Serpent::lifeTotal) + " HP");
+    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::SPEED_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Speed: " + std::to_string((int)Serpent::speedTotal) + " m/s");
+    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::ACCELERATION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Acceleration: " + std::to_string((int)Serpent::accelerationTotal) + " m/s^2");
+    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::CURRENT_ENERGY_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Current Energy: " + std::to_string((int)Serpent::currentEnergy) + " kcal");
+    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::MAX_ENERGY_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Energy Capacity: " + std::to_string((int)Serpent::maxEnergy) + " kcal");
+    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::ENERGY_PRODUCTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "EN Production: " + std::to_string((int)Serpent::energyProductionTotal) + " kcal/s");
+    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::ENERGY_CONSUMPTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "EN Consumption: " + std::to_string((int)Serpent::energyConsumptionTotal) + " kcal/s");
+
+}
+
+void Game::DrawDebugGrid()
+{
+    for(int x = 0; x <= Display::WIDTH / Tile::WIDTH; x++) //Columns
+    {
+        al_draw_line(x*Tile::WIDTH - (int)Camera::xPosition%(int)Tile::HEIGHT,
+                     0,
+                     x*Tile::WIDTH  - (int)Camera::xPosition%(int)Tile::HEIGHT,
+                     Display::HEIGHT,
+                     COLKEY_GRID,1);
+    }
+
+    for(int y = 0; y <= Display::HEIGHT / Tile::HEIGHT; y++) //Rows
+    {
+        al_draw_line(0,
+                     y*Tile::WIDTH  - (int)Camera::yPosition%(int)Tile::HEIGHT,
+                     Display::WIDTH,
+                     y*Tile::WIDTH  - (int)Camera::yPosition%(int)Tile::HEIGHT,
+                     COLKEY_GRID,1);
+    }
+}
+
+
+
+void Game::DrawDebugGridCameraCrosshair()
+{
+    al_draw_line(Display::WIDTH/2, 0, Display::WIDTH/2, Display::HEIGHT, COLKEY_CAMERA_CROSSHAIR_LOCKED, 1);
+    al_draw_line(0, Display::HEIGHT/2, Display::WIDTH, Display::HEIGHT/2, COLKEY_CAMERA_CROSSHAIR_LOCKED, 1);
+}
+
+
+
+void Game::DrawDebugGridText()
+{
+    int camXPos = Camera::xPosition;
+    int camYPos = Camera::yPosition;
+
+    int camXCell = std::round(camXPos/Tile::WIDTH);
+    int camYCell = std::round(camYPos/Tile::HEIGHT);
+
+    int zoomPercentage = Camera::zoomScale*100;
+
+    std::string cameraPositionString = "Crosshair position: (" + std::to_string(camXPos) + ", " + std::to_string(camYPos) + ") : ("
+                                       + std::to_string(camXCell) + ", " + std::to_string(camYCell) + ") "
+                                       + std::to_string(zoomPercentage) + "% zoom";
+
+    Hax::string_al_draw_text(Resource::builtin8,COLKEY_CAMERA_CROSSHAIR_LOCKED,0,0,ALLEGRO_ALIGN_LEFT,cameraPositionString);
+
+}
+
+void Game::LeftClickOnSegment(Segment* s)
+{
+    if(s != nullptr)
+        UpgradeMenu::segmentSelected = true;
+    else
+        UpgradeMenu::segmentSelected = false;
+
+    UpgradeMenu::whichSegment = s;
+}
+
+void Game::LeftClickOnButton(int whichButton)
+{
+    switch(whichButton)
+    {
+    case UpgradeMenu::MENU_BUTTON_REPAIR:
+        UpgradeMenu::whichSegment->ToggleRepairFunction();
+        std::cout << "Repair button pushed " << std::endl;
+        break;
+
+    case UpgradeMenu::MENU_BUTTON_PROPULSION:
+        UpgradeMenu::whichSegment->TogglePropulsionFunction();
+        std::cout << "Propulsion button pushed " << std::endl;
+        break;
+
+    case UpgradeMenu::MENU_BUTTON_ALERTNESS:
+        UpgradeMenu::whichSegment->ToggleAlertnessFunction();
+        std::cout << "Alertness button pushed " << std::endl;
+        break;
+    }
+}
