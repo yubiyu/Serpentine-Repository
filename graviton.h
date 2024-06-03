@@ -9,6 +9,9 @@ class Graviton
 public:
     static std::vector<Graviton*>streamA;
     static std::vector<Graviton*>streamB;
+    static std::vector<Graviton*>repairParticles;
+    static std::vector<Graviton*>damageParticles;
+
     static constexpr float gravitationalAcceleration = 0.004905;
 
     bool alive;

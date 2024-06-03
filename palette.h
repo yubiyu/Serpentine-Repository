@@ -16,6 +16,9 @@ struct Palette
     static ALLEGRO_COLOR COL_NYX8[8]; // Uses Javier Guerrero's palette "Nyx 8" --- https://lospec.com/palette-list/nyx8
     static ALLEGRO_COLOR COL_OIL6[6]; // Uses GrafxKid's palette "Oil 6" --- https://lospec.com/palette-list/oil-6
 
+    //static ALLEGRO_COLOR SERPENT_OUTER_COLOURS[20];
+    //static ALLEGRO_COLOR SERPENT_INNER_COLOURS[20];
+
     static ALLEGRO_COLOR currentClearColour;
     static ALLEGRO_COLOR transparentColour;
 

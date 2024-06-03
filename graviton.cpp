@@ -2,6 +2,8 @@
 
 std::vector<Graviton*> Graviton::streamA;
 std::vector<Graviton*> Graviton::streamB;
+std::vector<Graviton*> Graviton::repairParticles;
+std::vector<Graviton*> Graviton::damageParticles;
 
 Graviton::Graviton()
 {

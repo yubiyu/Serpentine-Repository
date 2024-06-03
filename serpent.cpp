@@ -1,26 +1,46 @@
 #include "serpent.h"
 
-float Serpent::lifeTotal;
-float Serpent::speedTotal; // Meters per second
-float Serpent::accelerationTotal;
+int Serpent::numPassengers;
+
+float Serpent::currentLife;
+float Serpent::maxLife;
+float Serpent::lifeRecovery;
+
+float Serpent::speed; // Meters per second
+float Serpent::acceleration;
+float Serpent::viscousDrag;
+float Serpent::wearRate;
+
 float Serpent::currentEnergy;
 float Serpent::maxEnergy;
-float Serpent::energyProductionTotal;
-float Serpent::energyConsumptionTotal;
+float Serpent::energyProduction;
+float Serpent::energyConsumption;
+float Serpent::energyConsumptionMod;
+
+float Serpent::repairSpeed;
+float Serpent::repairAcceleration;
+float Serpent::repairLoss;
+
+float Serpent::currentAmneties;
+float Serpent::amnetiesGeneration;
+float Serpent::amnetiesAttenuation;
+
+int Serpent::totalLights;
 
 int Serpent::propulsionLevel;
 float Serpent::propulsionAccelerationMod;
 float Serpent::propulsionEnergyConsumptionMod;
+float Serpent::propulsionEnergyTotal;
 
 int Serpent::repairLevel;
-float Serpent::repairRateMod;
+float Serpent::repairAccelerationMod;
 float Serpent::repairEnergyConsumptionMod;
+float Serpent::repairEnergyTotal;
 
 int Serpent::alertnessLevel;
 float Serpent::alertnessShieldMod;
 float Serpent::alertnessEnergyConsumptionMod;
-
-int Serpent::totalLights;
+float Serpent::alertnessEnergyTotal;
 
 Segment* Serpent::headSegment;
 Segment* Serpent::keySegmentA;
@@ -49,34 +69,70 @@ float Serpent::pathSlopeMod[MAX_SEGMENT];
 
 void Serpent::Initialize()
 {
+    numPassengers = 10;
+
+    Segment* genericSegment;
+
     headSegment = new Segment();
     headSegment->SetClassification(Segment::SEGMENT_CLASS_HEAD);
+    headSegment->colour = 0;
     segments.push_back(headSegment);
-    segments.push_back(new Segment());
-    segments.push_back(new Segment());
-    headSegment->propulsionFunctionActive = true;
-    headSegment->alertnessFunctionActive = true;
+
+    genericSegment = new Segment();
+    genericSegment->colour = 1;
+    segments.push_back(genericSegment);
+
+    genericSegment = new Segment();
+    genericSegment->colour = 2;
+    segments.push_back(genericSegment);
+
+///
 
     keySegmentA = new Segment();
     keySegmentA->SetClassification(Segment::SEGMENT_CLASS_KEY);
+    keySegmentA->colour = 3;
     segments.push_back(keySegmentA);
-    segments.push_back(new Segment());
-    segments.push_back(new Segment());
 
+    genericSegment = new Segment();
+    genericSegment->colour = 4;
+    segments.push_back(genericSegment);
+
+    genericSegment = new Segment();
+    genericSegment->colour = 5;
+    segments.push_back(genericSegment);
+
+///
     keySegmentB = new Segment();
     keySegmentB->SetClassification(Segment::SEGMENT_CLASS_KEY);
+    keySegmentB->colour = 6;
     segments.push_back(keySegmentB);
-    segments.push_back(new Segment());
-    segments.push_back(new Segment());
 
+    genericSegment = new Segment();
+    genericSegment->colour = 7;
+    segments.push_back(genericSegment);
+
+    genericSegment = new Segment();
+    genericSegment->colour = 8;
+    segments.push_back(genericSegment);
+
+///
     keySegmentC = new Segment();
     keySegmentC->SetClassification(Segment::SEGMENT_CLASS_KEY);
+    keySegmentC->colour = 9;
     segments.push_back(keySegmentC);
-    segments.push_back(new Segment());
-    segments.push_back(new Segment());
 
+    genericSegment = new Segment();
+    genericSegment->colour = 10;
+    segments.push_back(genericSegment);
+
+    genericSegment = new Segment();
+    genericSegment->colour = 11;
+    segments.push_back(genericSegment);
+
+///
     tailSegment = new Segment();
     tailSegment->SetClassification(Segment::SEGMENT_CLASS_TAIL);
+    tailSegment->colour = 12;
     segments.push_back(tailSegment);
 
     anchorXPosition = 200;
@@ -84,21 +140,32 @@ void Serpent::Initialize()
     anchorYPosition = 480;
     anchorYPositionTarget = Hax::RandFloatRange(ANCHOR_Y_POSITION_MIN, ANCHOR_Y_POSITION_MAX);
 
-    segmentXSeparation = segmentXSeparationTarget = Hax::RandFloatRange(SEGMENT_X_SEPARATION_MIN, SEGMENT_X_SEPARATION_MAX);
+    segmentXSeparation = segmentXSeparationTarget = SEGMENT_BASE_X_SEPARATION;
 
-    speedTotal = 0;
+    currentLife = maxLife = BASE_LIFE;
+    lifeRecovery = 0;
+    currentAmneties = 0;
+    amnetiesGeneration = 0;
+    amnetiesAttenuation = 0;
+    speed = 0;
+    acceleration = BASE_ACCELERATION;
+    viscousDrag = 0;
+    wearRate = 0;
+    currentEnergy = maxEnergy = BASE_ENERGY_CAPACITY;
+    energyProduction = BASE_ENERGY_PRODUCTION;
+    energyConsumption = BASE_ENERGY_CONSUMPTION;
+    energyConsumptionMod = 1.0;
 
-    maxEnergy = 0;
+    totalLights = 0;
     for(std::vector<Segment*>::iterator it = segments.begin(); it != segments.end(); ++it)
     {
-        maxEnergy += (*it)->maxEnergyContribution;
+        totalLights += (*it)->numLights;
     }
 
     UpdateRepairLevel();
     UpdatePropulsionLevel();
     UpdateAlertnessLevel();
 
-    currentEnergy = maxEnergy;
     UpdateStats();
 
     pathAmplitude = pathAmplitudeTarget = PATH_AMPLITUDE_MIN;
@@ -128,33 +195,52 @@ void Serpent::Update()
 
 void Serpent::UpdateStats()
 {
-    lifeTotal = 0;
-    accelerationTotal = 0;
-    maxEnergy = 0;
-    energyProductionTotal = 0;
-    energyConsumptionTotal = 0;
-    totalLights = 0;
+    acceleration = BASE_ACCELERATION + ACCELERATION_PER_PROPELLER*propulsionAccelerationMod;
+    speed += acceleration/Time::FPS;
+    viscousDrag = VISCOUS_DRAG_COEFFICIENT*speed;
+    speed -= viscousDrag/Time::FPS;
+    if(speed < 0)
+        speed = 0;
 
-    for(std::vector<Segment*>::iterator it = segments.begin(); it != segments.end(); ++it)
-    {
-        lifeTotal += (*it)->currentLife;
-        accelerationTotal += (*it)->accelerationContribution;
-        maxEnergy += (*it)->maxEnergyContribution;
-        energyProductionTotal += (*it)->energyProduction;
-        energyConsumptionTotal += (*it)->energyConsumption;
-        totalLights += (*it)->numLights;
-    }
+    wearRate = viscousDrag*WEAR_RATIO;
+    currentLife -= wearRate/Time::FPS;
 
-    speedTotal += accelerationTotal/Time::FPS;
+    repairAcceleration = REPAIR_ACCELERATION_PER_MODULE*repairAccelerationMod;
+    repairSpeed += repairAcceleration/Time::FPS;
+    repairLoss = REPAIR_LOSS_COEFFICIENT*repairSpeed;
+    repairSpeed -= repairLoss/Time::FPS;
+    if(repairSpeed < 0)
+        repairSpeed = 0;
 
-    currentEnergy += energyProductionTotal/Time::FPS;
-    if(currentEnergy > maxEnergy)
-        currentEnergy = maxEnergy;
+    currentLife += repairSpeed/Time::FPS;
 
-    energyConsumptionTotal = energyConsumptionTotal * (1.0 + repairEnergyConsumptionMod+propulsionEnergyConsumptionMod+alertnessEnergyConsumptionMod);
-    currentEnergy -= energyConsumptionTotal / Time::FPS;
+    if(currentLife > maxLife)
+        currentLife = maxLife;
+    if(currentLife < 0)
+        currentLife = 0;
+
+    amnetiesGeneration = AMNETIES_PER_GENERATOR*alertnessShieldMod;
+    currentAmneties += amnetiesGeneration/Time::FPS;
+    amnetiesAttenuation = AMNETIES_ATTENUATION_COEFFICIENT*currentAmneties;
+    currentAmneties -= amnetiesAttenuation/Time::FPS;
+
+    if(currentAmneties < 0)
+        currentAmneties = 0;
+
+    currentEnergy += energyProduction/Time::FPS;
+
+    energyConsumptionMod = 1.0 + repairEnergyConsumptionMod + propulsionEnergyConsumptionMod + alertnessEnergyConsumptionMod;
+    energyConsumption = BASE_ENERGY_CONSUMPTION * energyConsumptionMod;
+    currentEnergy -= energyConsumption / Time::FPS;
+
+    propulsionEnergyTotal = propulsionEnergyConsumptionMod * BASE_ENERGY_CONSUMPTION;
+    repairEnergyTotal = repairEnergyConsumptionMod * BASE_ENERGY_CONSUMPTION;
+    alertnessEnergyTotal = alertnessEnergyConsumptionMod * BASE_ENERGY_CONSUMPTION;
+
     if(currentEnergy < 0)
         currentEnergy = 0;
+    else if(currentEnergy > maxEnergy)
+        currentEnergy = maxEnergy;
 }
 
 void Serpent::UpdatePathCoordinates()
@@ -168,7 +254,7 @@ void Serpent::UpdatePathCoordinates()
 
         anchorXPositionTarget = Hax::RandFloatRange(ANCHOR_X_POSITION_MIN, ANCHOR_X_POSITION_MAX);
         anchorYPositionTarget = Hax::RandFloatRange(ANCHOR_Y_POSITION_MIN, ANCHOR_Y_POSITION_MAX);
-        segmentXSeparationTarget = Hax::RandFloatRange(SEGMENT_X_SEPARATION_MIN, SEGMENT_X_SEPARATION_MAX);
+        segmentXSeparationTarget = SEGMENT_BASE_X_SEPARATION + speed/SEGMENT_SPEED_TO_X_SEPARATION_RATIO;
     }
 
     pathAmplitude += (pathAmplitudeTarget-pathAmplitude) * 0.01;
@@ -186,7 +272,10 @@ void Serpent::UpdatePathCoordinates()
     anchorXPosition += (anchorXPositionTarget - anchorXPosition)*0.0025;
     anchorYPosition += (anchorYPositionTarget - anchorYPosition)*0.005;
 
-    segmentXSeparation += (segmentXSeparationTarget-segmentXSeparation)*0.0005;
+    if(segmentXSeparation > segmentXSeparationTarget)
+        segmentXSeparation -= 0.1;
+    else if(segmentXSeparation < segmentXSeparationTarget)
+        segmentXSeparation += 0.1;
 
     int index = 0;
     for(std::vector<Segment*>::iterator it = segments.begin(); it != segments.end(); ++it)
@@ -207,33 +296,38 @@ void Serpent::UpdatePropulsionLevel()
             propulsionLevel ++;
     }
 
-    switch(propulsionLevel)
-    {
-    case PROP_AHEAD_NEUTRAL:
-        propulsionEnergyConsumptionMod = 0.0;
-        propulsionAccelerationMod = 0.0;
-        break;
+    /** Quadratic formula: y = Ax^2 + Bx + C
+        y IS propulsionEnergyConsumptionMod
+        x = propLevel
+        A = 0.1
+        B = 1
+        C = 0
 
-    case PROP_AHEAD_SLOW:
-        propulsionEnergyConsumptionMod = 0.5;
-        propulsionAccelerationMod = 0.3;
-        break;
+        f(0) = 0
+        f(1) = 1.1
+        f(2) = 2.4
+        f(3) = 3.9
+        f(4) = 5.6
+        f(5) = 7.5
 
-    case PROP_AHEAD_STANDARD:
-        propulsionEnergyConsumptionMod = 1.0;
-        propulsionAccelerationMod = 1.0;
-        break;
+        y IS propulsionAccelerationMod
+        x = propLevel
+        A = -0.1
+        B = 2
+        C = 0
 
-    case PROP_AHEAD_FULL:
-        propulsionEnergyConsumptionMod = 1.5;
-        propulsionAccelerationMod = 1.3;
-        break;
+        f(0) = 0.0
+        f(1) = 1.9
+        f(2) = 3.6
+        f(3) = 5.1
+        f(4) = 6.4
+        f(5) = 7.5
+    */
 
-    case PROP_AHEAD_FLANK:
-        propulsionEnergyConsumptionMod = 2.5;
-        propulsionAccelerationMod = 1.5;
-        break;
-    }
+    propulsionEnergyConsumptionMod = 0.1*(std::pow(propulsionLevel,2)) + propulsionLevel + 0;
+    propulsionAccelerationMod = -0.1*(std::pow(propulsionLevel,2)) + 2*propulsionLevel + 0;
+
+    segments[0]->gravitonEmissionCD = Segment::GRAVITON_EMISSION_BASE_CD - 2*propulsionLevel;
 }
 
 void Serpent::UpdateRepairLevel()
@@ -245,33 +339,36 @@ void Serpent::UpdateRepairLevel()
             repairLevel ++;
     }
 
-    switch(repairLevel)
-    {
-    case REP_DISABLED:
-        repairEnergyConsumptionMod = 0.0;
-        repairRateMod = 0.0;
-        break;
+    /** Quadratic formula: y = Ax^2 + Bx + C
+        y IS repairEnergyConsumptionMod
+        x = repairLevel
+        A = 0.3
+        B = 1
+        C = 0
 
-    case REP_SLOW:
-        repairEnergyConsumptionMod = 1.5;
-        repairRateMod = 0.5;
-        break;
+        f(0) = 0.0
+        f(1) = 1.3
+        f(2) = 3.2
+        f(3) = 5.7
+        f(4) = 8.8
+        f(5) = 12.5
 
-    case REP_STANDARD:
-        repairEnergyConsumptionMod = 3.0;
-        repairRateMod = 1.0;
-        break;
+        y IS repairAccelerationMod
+        x = repairLevel
+        A = -0.1
+        B = 2
+        C = 0
 
-    case REP_BOOSTED:
-        repairEnergyConsumptionMod = 6.0;
-        repairRateMod = 2.0;
-        break;
+        f(0) = 0.0
+        f(1) = 1.9
+        f(2) = 3.6
+        f(3) = 5.1
+        f(4) = 6.4
+        f(5) = 7.5
+    */
 
-    case REP_EMERGENCY:
-        repairEnergyConsumptionMod = 12.0;
-        repairRateMod = 5.0;
-        break;
-    }
+    repairEnergyConsumptionMod = 0.3*(std::pow(repairLevel,2)) + 1*repairLevel + 0;
+    repairAccelerationMod = -0.1*(std::pow(repairLevel,2)) + 2*repairLevel + 0;
 }
 
 void Serpent::UpdateAlertnessLevel()
@@ -283,31 +380,34 @@ void Serpent::UpdateAlertnessLevel()
             alertnessLevel ++;
     }
 
-    switch(alertnessLevel)
-    {
-    case ALERT_OFF:
-        alertnessEnergyConsumptionMod = 0.0;
-        alertnessShieldMod = 0.0;
-        break;
+    /** Quadratic formula: y = Ax^2 + Bx + C
+        y IS alertnessEnergyConsumptionMod
+        x = alertnessLevel
+        A = 0.2
+        B = 0.4
+        C = 0
 
-    case ALERT_MILD:
-        alertnessEnergyConsumptionMod = 0.5;
-        alertnessShieldMod = 0.5;
-        break;
+        f(0) = 0.0
+        f(1) = 0.6
+        f(2) = 1.6
+        f(3) = 3.3
+        f(4) = 4.8
+        f(5) = 7.0
 
-    case ALERT_STANDARD:
-        alertnessEnergyConsumptionMod = 1.0;
-        alertnessShieldMod = 1.0;
-        break;
+        y IS alertnessShieldMod
+        x = alertnessLevel
+        A = -0.1
+        B = 2
+        C = 0
 
-    case ALERT_HEIGHTENED:
-        alertnessEnergyConsumptionMod = 1.5;
-        alertnessShieldMod = 2.0;
-        break;
+        f(1) = 1.9
+        f(2) = 3.6
+        f(3) = 5.1
+        f(4) = 6.4
+        f(5) = 7.5
+    */
 
-    case ALERT_INTENSE:
-        alertnessEnergyConsumptionMod = 2.0;
-        alertnessShieldMod = 3.0;
-        break;
-    }
+    alertnessEnergyConsumptionMod = 0.2*(std::pow(alertnessLevel,2)) + 0.4*alertnessLevel + 0;
+    alertnessShieldMod = -0.1*(std::pow(alertnessLevel,2)) + 2*alertnessLevel + 0;
+
 }

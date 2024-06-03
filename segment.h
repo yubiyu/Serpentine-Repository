@@ -3,34 +3,29 @@
 
 #include "graviton.h"
 #include "time.h"
+#include "hax.h"
+
+#include <iostream>
 
 class Segment
 {
 public:
     enum enumClassification
     {
-        SEGMENT_CLASS_HEAD = 0,
-        SEGMENT_CLASS_KEY = 1,
-        SEGMENT_CLASS_TAIL = 2,
-        SEGMENT_CLASS_GENERIC = 3
-
+        SEGMENT_CLASS_TAIL = 0,
+        SEGMENT_CLASS_GENERIC = 1,
+        SEGMENT_CLASS_KEY = 2,
+        SEGMENT_CLASS_HEAD = 3
     };
-    static const int SEGMENT_CLASS_MARKER_BEGIN = SEGMENT_CLASS_HEAD;
-    static const int SEGMENT_CLASS_MARKER_END = SEGMENT_CLASS_GENERIC;
+    static const int NUM_SEGMENT_CLASSIFICATIONS = 4;
+    static const int NUM_SEGMENT_COLOURS = 20;
+
+    static constexpr float BASE_GRAVITON_PROJECTION_VELOCITY = 2.5;
 
     int classification;
     bool alive;
-    int currentLife;
-    int maxLife;
-    int lifeRecovery;
-    int accelerationContribution;
-    int maxEnergyContribution;
-    int energyProduction;
-    int energyConsumption;
-    static const int BASE_ENERGY_PRODUCTION = 45000;
-    static const int BASE_ENERGY_CONSUMPTION = 45100;
-    static const int BASE_ENERGY_CAPACITY = BASE_ENERGY_PRODUCTION*30;
 
+    bool hasRepairFunction;
     bool repairFunctionActive;
     bool hasPropulsionFunction;
     bool propulsionFunctionActive;
@@ -40,13 +35,17 @@ public:
     bool emitsGravitons;
     int gravitonAEmissionTicks, gravitonBEmissionTicks;
     int gravitonEmissionCD;
+    static const int GRAVITON_EMISSION_BASE_CD = 12;
+
     float gravitonAPhase, gravitonAAngleModifier;
     float gravitonBPhase, gravitonBAngleModifier;
 
     float xPosition, yPosition;
     float rotationAngle;
 
+    int colour;
     int numLights;
+    bool isDamaged;
 
     Segment();
     ~Segment();
@@ -54,9 +53,14 @@ public:
     void Initialize();
     void SetClassification(int setting);
     void Update();
+
     void ToggleRepairFunction();
     void TogglePropulsionFunction();
     void ToggleAlertnessFunction();
+    void ChangeColour();
+
+    void EmitDamageGraviton();
+    void EmitRepairGraviton();
 
 };
 

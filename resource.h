@@ -15,13 +15,16 @@
 struct Resource
 {
     static ALLEGRO_FONT *builtin8;
+    static ALLEGRO_FONT *lowresPixelRegular16;
+    static ALLEGRO_FONT *lowresPixelRegular32;
 
     static ALLEGRO_BITMAP *genericTitlePng;
     static ALLEGRO_BITMAP *genericOverworldPng;
     static ALLEGRO_BITMAP *genericResultsPng;
     static ALLEGRO_BITMAP *genericBeingPng;
     static ALLEGRO_BITMAP *genericTilePng;
-    static ALLEGRO_BITMAP *serpentSegmentPng[Segment::SEGMENT_CLASS_MARKER_END+1];
+    static ALLEGRO_BITMAP *serpentSegmentPng;
+    static ALLEGRO_BITMAP *serpentSegmentSubBitmap[Segment::NUM_SEGMENT_COLOURS][Segment::NUM_SEGMENT_CLASSIFICATIONS];
     static ALLEGRO_BITMAP *serpentKeyLightsPng[3];
     static ALLEGRO_BITMAP *serpentGenericLightsPng[2];
     static ALLEGRO_BITMAP *foregroundStarPng[2];
@@ -29,10 +32,16 @@ struct Resource
     static ALLEGRO_BITMAP *backgroundStarPng[2];
     static ALLEGRO_BITMAP *farBackgroundStarPng[2];
     static ALLEGRO_BITMAP *gravitonPng;
+    static ALLEGRO_BITMAP *gravitonGreenPng;
+    static ALLEGRO_BITMAP *gravitonRedPng;
     static ALLEGRO_BITMAP *selectorCirclePng;
     static ALLEGRO_BITMAP *propulsionButtonPng[2];
     static ALLEGRO_BITMAP *repairButtonPng[2];
     static ALLEGRO_BITMAP *alertnessButtonPng[2];
+    static ALLEGRO_BITMAP *recolourButtonPng;
+    static ALLEGRO_BITMAP *stationPng[3];
+    static ALLEGRO_BITMAP *exitStationArrowPng;
+    static ALLEGRO_BITMAP *nextStationArrowPng;
 
     static ALLEGRO_SAMPLE *genericBgmMp3;
     static ALLEGRO_SAMPLE_INSTANCE *genericBgmSampleInstance;

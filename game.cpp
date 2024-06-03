@@ -97,12 +97,13 @@ bool Game::Initialize(char **argv)
     Camera::SetCell(0, 0);
     Camera::WarpToDestination();
 
-    al_start_timer(Time::FPSTimer);
-
     Serpent::Initialize();
     Star::GenerateStarfield();
     Space::Initialize();
     UpgradeMenu::Initialize();
+    Station::Initialize();
+
+    al_start_timer(Time::FPSTimer);
 
     al_set_sample_instance_playmode(Resource::starryWalkSampleInstance, ALLEGRO_PLAYMODE_LOOP);
     al_play_sample_instance(Resource::starryWalkSampleInstance);
@@ -122,6 +123,16 @@ void Game::Uninitialize()
     {
         delete *it;
         Graviton::streamB.erase(it);
+    }
+    for(std::vector<Graviton*>::iterator it = Graviton::repairParticles.begin(); it != Graviton::repairParticles.end();)
+    {
+        delete *it;
+        Graviton::repairParticles.erase(it);
+    }
+    for(std::vector<Graviton*>::iterator it = Graviton::damageParticles.begin(); it != Graviton::damageParticles.end();)
+    {
+        delete *it;
+        Graviton::damageParticles.erase(it);
     }
 
     for(std::vector<Star*>::iterator it = Star::foregroundStarfield.begin(); it != Star::foregroundStarfield.end();)
@@ -267,24 +278,43 @@ void Game::OverworldInput()
                     if(Mouse::mouseDisplayX > UpgradeMenu::xPosition + UpgradeMenu::PROPULSION_BUTTON_X_OFFSET-8 &&
                             Mouse::mouseDisplayX < UpgradeMenu::xPosition + UpgradeMenu::PROPULSION_BUTTON_X_OFFSET+40)
                     {
-                        LeftClickOnButton(UpgradeMenu::MENU_BUTTON_PROPULSION);
-                        menuButtonFound = true;
-                        break;
+                        if(UpgradeMenu::whichSegment->hasPropulsionFunction)
+                        {
+                            LeftClickOnButton(UpgradeMenu::MENU_BUTTON_PROPULSION);
+                            menuButtonFound = true;
+                            break;
+                        }
                     }
                     else if(Mouse::mouseDisplayX > UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET-8 &&
                             Mouse::mouseDisplayX < UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET+40)
                     {
-                        LeftClickOnButton(UpgradeMenu::MENU_BUTTON_REPAIR);
-                        menuButtonFound = true;
-                        break;
+                        if(UpgradeMenu::whichSegment->hasRepairFunction)
+                        {
+                            LeftClickOnButton(UpgradeMenu::MENU_BUTTON_REPAIR);
+                            menuButtonFound = true;
+                            break;
+                        }
                     }
                     else if(Mouse::mouseDisplayX > UpgradeMenu::xPosition + UpgradeMenu::ALERTNESS_BUTTON_X_OFFSET-8 &&
                             Mouse::mouseDisplayX < UpgradeMenu::xPosition + UpgradeMenu::ALERTNESS_BUTTON_X_OFFSET+40)
                     {
-                        LeftClickOnButton(UpgradeMenu::MENU_BUTTON_ALERTNESS);
-                        menuButtonFound = true;
-                        break;
+                        if(UpgradeMenu::whichSegment->hasAlertnessFunction)
+                        {
+                            LeftClickOnButton(UpgradeMenu::MENU_BUTTON_ALERTNESS);
+                            menuButtonFound = true;
+                            break;
+                        }
                     }
+                }
+
+                else if(Mouse::mouseDisplayY > UpgradeMenu::yPosition + UpgradeMenu::RECOLOUR_BUTTON_Y_OFFSET-8 &&
+                        Mouse::mouseDisplayY < UpgradeMenu::yPosition + UpgradeMenu::RECOLOUR_BUTTON_Y_OFFSET+40 &&
+                        Mouse::mouseDisplayX > UpgradeMenu::xPosition + UpgradeMenu::RECOLOUR_BUTTON_X_OFFSET-8 &&
+                        Mouse::mouseDisplayX < UpgradeMenu::xPosition + UpgradeMenu::RECOLOUR_BUTTON_X_OFFSET+40)
+                {
+                    LeftClickOnButton(UpgradeMenu::MENU_BUTTON_RECOLOUR);
+                    menuButtonFound = true;
+                    break;
                 }
 
             }
@@ -294,7 +324,7 @@ void Game::OverworldInput()
                 if(Mouse::mouseDisplayX > (*it)->xPosition-32 && Mouse::mouseDisplayX < (*it)->xPosition+32
                         && Mouse::mouseDisplayY > (*it)->yPosition-32 && Mouse::mouseDisplayY < (*it)->yPosition+32)
                 {
-                    std::cout << "Test: Segment " << segmentIndex << " clicked." << std::endl;
+                    //std::cout << "Test: Segment " << segmentIndex << " clicked." << std::endl;
                     LeftClickOnSegment(*it);
                     segmentFound = true;
                     break;
@@ -350,28 +380,29 @@ void Game::OverworldSceneLogic()
     Space::Update();
     Serpent::Update();
     UpgradeMenu::Update();
+    Station::Update(Serpent::speed, Serpent::pathYMod[0]);
 
     for(std::vector<Star*>::iterator it = Star::farBackgroundStarfield.begin(); it != Star::farBackgroundStarfield.end(); ++it)
     {
-        (*it)->xPosition -= 0.125;
+        (*it)->xPosition -= 0.125 + Serpent::speed/2056;
         (*it)->yPosition -= Serpent::pathYMod[0]/2056;
         (*it)->Update();
     }
     for(std::vector<Star*>::iterator it = Star::backgroundStarfield.begin(); it != Star::backgroundStarfield.end(); ++it)
     {
-        (*it)->xPosition -= 1.0;
+        (*it)->xPosition -= 0.25 + Serpent::speed/256;
         (*it)->yPosition -= Serpent::pathYMod[0]/256;
         (*it)->Update();
     }
     for(std::vector<Star*>::iterator it = Star::centralStarfield.begin(); it != Star::centralStarfield.end(); ++it)
     {
-        (*it)->xPosition -= 2.0;
+        (*it)->xPosition -= 0.5 + Serpent::speed/128;
         (*it)->yPosition -= Serpent::pathYMod[0]/128;
         (*it)->Update();
     }
     for(std::vector<Star*>::iterator it = Star::foregroundStarfield.begin(); it != Star::foregroundStarfield.end(); ++it)
     {
-        (*it)->xPosition -= 5.0;
+        (*it)->xPosition -= 1.25 + Serpent::speed/24;
         (*it)->yPosition -= Serpent::pathYMod[0]/24;
         (*it)->Update();
     }
@@ -380,6 +411,7 @@ void Game::OverworldSceneLogic()
     for(std::vector<Graviton*>::iterator it = Graviton::streamA.begin(); it != Graviton::streamA.end();)
     {
         (*it)->Update();
+        (*it)->xPosition -= Serpent::speed/300;
         if(! (*it)->alive)
         {
             delete *it;
@@ -391,10 +423,37 @@ void Game::OverworldSceneLogic()
     for(std::vector<Graviton*>::iterator it = Graviton::streamB.begin(); it != Graviton::streamB.end();)
     {
         (*it)->Update();
+        (*it)->xPosition -= Serpent::speed/300;
         if(! (*it)->alive)
         {
             delete *it;
             Graviton::streamB.erase(it);
+        }
+        else
+            ++it;
+    }
+
+    for(std::vector<Graviton*>::iterator it = Graviton::repairParticles.begin(); it != Graviton::repairParticles.end();)
+    {
+        (*it)->Update();
+        (*it)->xPosition -= Serpent::speed/300;
+        if(! (*it)->alive)
+        {
+            delete *it;
+            Graviton::repairParticles.erase(it);
+        }
+        else
+            ++it;
+    }
+
+    for(std::vector<Graviton*>::iterator it = Graviton::damageParticles.begin(); it != Graviton::damageParticles.end();)
+    {
+        (*it)->Update();
+        (*it)->xPosition -= Serpent::speed/300;
+        if(! (*it)->alive)
+        {
+            delete *it;
+            Graviton::damageParticles.erase(it);
         }
         else
             ++it;
@@ -452,6 +511,12 @@ void Game::OverworldSceneDrawing()
         al_draw_bitmap(Resource::farBackgroundStarPng[(*it)->variant], (*it)->xPosition, (*it)->yPosition, 0);
     for(std::vector<Star*>::iterator it = Star::backgroundStarfield.begin(); it != Star::backgroundStarfield.end(); ++it)
         al_draw_bitmap(Resource::backgroundStarPng[(*it)->variant], (*it)->xPosition, (*it)->yPosition, 0);
+
+
+    if(Station::atStation)
+        al_draw_bitmap(Resource::stationPng[Station::currentStation],Station::drawX,Station::drawY,0);
+
+
     for(std::vector<Star*>::iterator it = Star::centralStarfield.begin(); it != Star::centralStarfield.end(); ++it)
         al_draw_bitmap(Resource::centralStarPng[(*it)->variant], (*it)->xPosition, (*it)->yPosition, 0);
 
@@ -460,15 +525,12 @@ void Game::OverworldSceneDrawing()
         al_draw_bitmap(Resource::gravitonPng, (*it)->xPosition, (*it)->yPosition, 0);
     }
 
-    int segmentPosition = 0;
     for(std::vector<Segment*>::reverse_iterator it = Serpent::segments.rbegin(); it != Serpent::segments.rend(); ++it)
     {
-        al_draw_rotated_bitmap(Resource::serpentSegmentPng[(*it)->classification], 32, 32,
+        al_draw_rotated_bitmap(Resource::serpentSegmentSubBitmap[(*it)->colour][(*it)->classification], 32, 32,
                                (*it)->xPosition, (*it)->yPosition,
                                (*it)->rotationAngle,
                                0);
-
-        segmentPosition++;
     }
 
     int energyPerLight = Serpent::maxEnergy / Serpent::totalLights;
@@ -481,8 +543,10 @@ void Game::OverworldSceneDrawing()
             for(int i = 0; i < (*it)->numLights; i++)
             {
                 energyCounted += energyPerLight;
-                if(Serpent::currentEnergy > energyCounted)
+                if(Serpent::currentEnergy >= energyCounted)
                     segmentLightLevel ++;
+                else
+                    break;
             }
 
             if(segmentLightLevel > 0)
@@ -498,8 +562,19 @@ void Game::OverworldSceneDrawing()
                                            (*it)->rotationAngle,
                                            0);
             }
-
         }
+
+        if(energyCounted > Serpent::currentEnergy)
+            break;
+    }
+
+    for(std::vector<Graviton*>::iterator it = Graviton::repairParticles.begin(); it != Graviton::repairParticles.end(); ++it)
+    {
+        al_draw_bitmap(Resource::gravitonGreenPng, (*it)->xPosition, (*it)->yPosition, 0);
+    }
+    for(std::vector<Graviton*>::iterator it = Graviton::damageParticles.begin(); it != Graviton::damageParticles.end(); ++it)
+    {
+        al_draw_bitmap(Resource::gravitonRedPng, (*it)->xPosition, (*it)->yPosition, 0);
     }
 
     for(std::vector<Graviton*>::iterator it = Graviton::streamA.begin(); it != Graviton::streamA.end(); ++it)
@@ -508,27 +583,30 @@ void Game::OverworldSceneDrawing()
     }
 
     for(std::vector<Star*>::iterator it = Star::foregroundStarfield.begin(); it != Star::foregroundStarfield.end(); ++it)
-        al_draw_tinted_bitmap(Resource::foregroundStarPng[(*it)->variant], al_map_rgba_f(1.0,1.0,1.0,0.5), (*it)->xPosition, (*it)->yPosition, 0);
+        al_draw_tinted_bitmap(Resource::foregroundStarPng[(*it)->variant], al_map_rgba_f(1.0,1.0,1.0,0.05), (*it)->xPosition, (*it)->yPosition, 0);
 
     if(UpgradeMenu::segmentSelected)
     {
-        al_draw_tinted_rotated_bitmap(Resource::selectorCirclePng, al_map_rgba_f(1.0,1.0,1.0,0.1),
+        al_draw_tinted_rotated_bitmap(Resource::selectorCirclePng, al_map_rgba_f(1.0,1.0,1.0,0.5),
                                       64, 64,
                                       UpgradeMenu::xPosition,
                                       UpgradeMenu::yPosition,
                                       UpgradeMenu::selectorCircleRotation,
                                       0);
 
-        if(UpgradeMenu::whichSegment->repairFunctionActive)
-            al_draw_tinted_bitmap(Resource::repairButtonPng[1], al_map_rgba_f(1.0,1.0,1.0,0.8),
-                                  UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET,
-                                  UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
-                                  0);
-        else
-            al_draw_tinted_bitmap(Resource::repairButtonPng[0], al_map_rgba_f(1.0,1.0,1.0,0.8),
-                                  UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET,
-                                  UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
-                                  0);
+        if(UpgradeMenu::whichSegment->hasRepairFunction)
+        {
+            if(UpgradeMenu::whichSegment->repairFunctionActive)
+                al_draw_tinted_bitmap(Resource::repairButtonPng[1], al_map_rgba_f(1.0,1.0,1.0,0.8),
+                                      UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET,
+                                      UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
+                                      0);
+            else
+                al_draw_tinted_bitmap(Resource::repairButtonPng[0], al_map_rgba_f(1.0,1.0,1.0,0.8),
+                                      UpgradeMenu::xPosition + UpgradeMenu::REPAIR_BUTTON_X_OFFSET,
+                                      UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
+                                      0);
+        }
 
         if(UpgradeMenu::whichSegment->hasPropulsionFunction)
         {
@@ -556,17 +634,53 @@ void Game::OverworldSceneDrawing()
                                       UpgradeMenu::yPosition + UpgradeMenu::BUTTONS_Y_OFFSET,
                                       0);
         }
+
+        al_draw_tinted_bitmap(Resource::recolourButtonPng, al_map_rgba_f(1.0,1.0,1.0,0.8),
+                              UpgradeMenu::xPosition + UpgradeMenu::RECOLOUR_BUTTON_X_OFFSET,
+                              UpgradeMenu::yPosition + UpgradeMenu::RECOLOUR_BUTTON_Y_OFFSET,
+                              0);
+    }
+
+    if(Station::atStation)
+    {
+        al_draw_bitmap(Resource::exitStationArrowPng, Station::STATION_ARROW_X, Station::STATION_ARROW_Y, 0);
+        al_draw_text(Resource::lowresPixelRegular16,Palette::COLKEY_TEXT_LIGHT, Station::STATION_ARROW_X, Station::STATION_ARROW_Y, ALLEGRO_ALIGN_RIGHT, "Departure");
+        Hax::string_al_draw_text(Resource::lowresPixelRegular16,Palette::COLKEY_TEXT_LIGHT, Station::STATION_ARROW_X, Station::STATION_ARROW_Y+16, ALLEGRO_ALIGN_RIGHT, std::to_string((int)Station::widthRemaining) + " m");
+    }
+    else // !atStation
+    {
+        al_draw_bitmap(Resource::nextStationArrowPng, Station::STATION_ARROW_X, Station::STATION_ARROW_Y, 0);
+        Hax::string_al_draw_text(Resource::lowresPixelRegular16,Palette::COLKEY_TEXT_LIGHT, Station::STATION_ARROW_X, Station::STATION_ARROW_Y, ALLEGRO_ALIGN_RIGHT, Station::stationNames[Station::nextStation]);
+        Hax::string_al_draw_text(Resource::lowresPixelRegular16,Palette::COLKEY_TEXT_LIGHT, Station::STATION_ARROW_X, Station::STATION_ARROW_Y+16, ALLEGRO_ALIGN_RIGHT, std::to_string((int)Station::distanceToStation) + " m");
+
     }
 
 
 
-    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::LIFE_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Life: " + std::to_string((int)Serpent::lifeTotal) + " HP");
-    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::SPEED_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Speed: " + std::to_string((int)Serpent::speedTotal) + " m/s");
-    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::ACCELERATION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Acceleration: " + std::to_string((int)Serpent::accelerationTotal) + " m/s^2");
-    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::CURRENT_ENERGY_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Current Energy: " + std::to_string((int)Serpent::currentEnergy) + " kcal");
-    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::MAX_ENERGY_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Energy Capacity: " + std::to_string((int)Serpent::maxEnergy) + " kcal");
-    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::ENERGY_PRODUCTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "EN Production: " + std::to_string((int)Serpent::energyProductionTotal) + " kcal/s");
-    Hax::string_al_draw_text(Resource::builtin8, COLKEY_TEXT_LIGHT, OverworldUI::STATS_READOUT_X, OverworldUI::ENERGY_CONSUMPTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "EN Consumption: " + std::to_string((int)Serpent::energyConsumptionTotal) + " kcal/s");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS1_READOUT_X, OverworldUI::LIFE_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Hull: " + std::to_string((int)Serpent::currentLife) + " / " + std::to_string((int)Serpent::maxLife) + "HP");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS1_READOUT_X, OverworldUI::REPAIR_SPEED_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Repair speed: " + std::to_string((int)Serpent::repairSpeed) + "HP/s");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS1_READOUT_X, OverworldUI::REPAIR_ACCELERATION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Repair acceleration: " +  std::to_string((int)Serpent::repairAcceleration) + " HP/s^2");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS1_READOUT_X, OverworldUI::REPAIR_LOSS_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Repair speed loss: " +  std::to_string((int)Serpent::repairLoss) + " HP/s");
+
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS2_READOUT_X, OverworldUI::SPEED_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Speed: " + std::to_string((int)Serpent::speed) + " m/s");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS2_READOUT_X, OverworldUI::ACCELERATION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Acceleration: " + std::to_string((int)Serpent::acceleration) + " m/s^2");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS2_READOUT_X, OverworldUI::VISCOUS_DRAG_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Viscous drag: " + std::to_string((int)Serpent::viscousDrag) + " N");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS2_READOUT_X, OverworldUI::WEAR_RATE_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Wear Rate: " + std::to_string((int)Serpent::wearRate) + " HP/s");
+
+
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS3_READOUT_X, OverworldUI::CURRENT_ENERGY_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Current energy: " + std::to_string((int)Serpent::currentEnergy) + " J");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS3_READOUT_X, OverworldUI::MAX_ENERGY_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Energy capacity: " + std::to_string((int)Serpent::maxEnergy) + " J");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS3_READOUT_X, OverworldUI::ENERGY_PRODUCTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "EN production: " + std::to_string((int)Serpent::energyProduction) + " W");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS3_READOUT_X, OverworldUI::ENERGY_CONSUMPTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "EN consumption: " + std::to_string((int)Serpent::energyConsumption) + " W");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS3_READOUT_X, OverworldUI::BASE_ENERGY_CONSUMPTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Life support EN: " + std::to_string((int)Serpent::BASE_ENERGY_CONSUMPTION) + " W");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS3_READOUT_X, OverworldUI::PROPULSION_ENERGY_CONSUMPTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Propulsion EN: " + std::to_string((int)Serpent::propulsionEnergyTotal) + " W");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS3_READOUT_X, OverworldUI::REPAIR_ENERGY_CONSUMPTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Repair EN: " + std::to_string((int)Serpent::repairEnergyTotal) + " W");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS3_READOUT_X, OverworldUI::AMNETIES_ENERGY_CONSUMPTION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Shield EN: " + std::to_string((int)Serpent::alertnessEnergyTotal) + " W");
+
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS4_READOUT_X, OverworldUI::PASSENGERS_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Passengers: " + std::to_string((int)Serpent::numPassengers) + " pipol");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS4_READOUT_X, OverworldUI::AMNETIES_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Amneties: " + std::to_string((int)Serpent::currentAmneties) + " happy");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS4_READOUT_X, OverworldUI::AMNETIES_GENERATION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Amneties generation: " + std::to_string((int)Serpent::amnetiesGeneration) + " happy/s");
+    Hax::string_al_draw_text(Resource::lowresPixelRegular16, COLKEY_TEXT_LIGHT, OverworldUI::STATS4_READOUT_X, OverworldUI::AMNETIES_ATTENUATION_READOUT_Y, ALLEGRO_ALIGN_LEFT, "Amneties attenuation: " + std::to_string((int)Serpent::amnetiesAttenuation) + " happy/s");
 
 }
 
@@ -635,17 +749,22 @@ void Game::LeftClickOnButton(int whichButton)
     {
     case UpgradeMenu::MENU_BUTTON_REPAIR:
         UpgradeMenu::whichSegment->ToggleRepairFunction();
-        std::cout << "Repair button pushed " << std::endl;
+        Serpent::UpdateRepairLevel();
         break;
 
     case UpgradeMenu::MENU_BUTTON_PROPULSION:
         UpgradeMenu::whichSegment->TogglePropulsionFunction();
-        std::cout << "Propulsion button pushed " << std::endl;
+        Serpent::UpdatePropulsionLevel();
         break;
 
     case UpgradeMenu::MENU_BUTTON_ALERTNESS:
         UpgradeMenu::whichSegment->ToggleAlertnessFunction();
-        std::cout << "Alertness button pushed " << std::endl;
+        Serpent::UpdateAlertnessLevel();
+        //std::cout << "Alertness button pushed " << std::endl;
+        break;
+
+    case UpgradeMenu::MENU_BUTTON_RECOLOUR:
+        UpgradeMenu::whichSegment->ChangeColour();
         break;
     }
 }

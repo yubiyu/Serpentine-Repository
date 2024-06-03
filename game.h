@@ -27,6 +27,7 @@
 #include "graviton.h"
 #include "space.h"
 #include "upgrademenu.h"
+#include "station.h"
 
 #include <iostream>
 

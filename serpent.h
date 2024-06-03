@@ -1,60 +1,70 @@
 #ifndef SERPENT_H_INCLUDED
 #define SERPENT_H_INCLUDED
 
-#include <vector>
-#include <cmath>
-
 #include "segment.h"
 #include "hax.h"
 #include "time.h"
 
+#include <vector>
+#include <cmath>
+#include <iostream>
+
 struct Serpent
 {
-    static float lifeTotal;
-    static float speedTotal;
-    static float accelerationTotal;
+    static int numPassengers;
+
+    static float currentLife;
+    static float maxLife;
+    static constexpr float BASE_LIFE = 1000;
+    static float lifeRecovery;
+    static constexpr float LIFE_RECOVERY_PER_REPAIRER = 10;
+
+    static float currentAmneties;
+    static float amnetiesGeneration;
+    static constexpr float AMNETIES_PER_GENERATOR = 15;
+    static float amnetiesAttenuation;
+    static constexpr float AMNETIES_ATTENUATION_COEFFICIENT = 0.10;
+
+    static float speed;
+    static float acceleration;
+    static constexpr float BASE_ACCELERATION = 1;
+    static constexpr float ACCELERATION_PER_PROPELLER = 15;
+    static float viscousDrag;
+    static constexpr float VISCOUS_DRAG_COEFFICIENT = 0.10;
+    static float wearRate;
+    static constexpr float WEAR_RATIO = 0.1;
+
+    static float repairSpeed;
+    static float repairAcceleration;
+    static constexpr float REPAIR_ACCELERATION_PER_MODULE = 1.0;
+    static float repairLoss;
+    static constexpr float REPAIR_LOSS_COEFFICIENT = 0.10;
+
     static float currentEnergy;
     static float maxEnergy;
-    static float energyProductionTotal;
-    static float energyConsumptionTotal;
+    static float energyProduction;
+    static float energyConsumption;
+    static float energyConsumptionMod;
+    static constexpr float BASE_ENERGY_PRODUCTION = 60000;
+    static constexpr float BASE_ENERGY_CONSUMPTION = 10000;
+    static constexpr float BASE_ENERGY_CAPACITY = BASE_ENERGY_PRODUCTION*25;
 
-    enum enumPropulsionLevels
-    {
-        PROP_AHEAD_NEUTRAL = 0,
-        PROP_AHEAD_SLOW = 1,
-        PROP_AHEAD_STANDARD = 2,
-        PROP_AHEAD_FULL = 3,
-        PROP_AHEAD_FLANK = 4
-    };
+    static int totalLights;
+
     static int propulsionLevel;
     static float propulsionAccelerationMod;
     static float propulsionEnergyConsumptionMod;
+    static float propulsionEnergyTotal;
 
-    enum enumRepairLevels
-    {
-        REP_DISABLED = 0,
-        REP_SLOW = 1,
-        REP_STANDARD = 2,
-        REP_BOOSTED = 3,
-        REP_EMERGENCY = 4
-    };
     static int repairLevel;
-    static float repairRateMod;
+    static float repairAccelerationMod;
     static float repairEnergyConsumptionMod;
+    static float repairEnergyTotal;
 
-    enum enumAlertnessLevels
-    {
-        ALERT_OFF = 0,
-        ALERT_MILD = 1,
-        ALERT_STANDARD = 2,
-        ALERT_HEIGHTENED = 3,
-        ALERT_INTENSE = 4
-    };
     static int alertnessLevel;
     static float alertnessShieldMod;
     static float alertnessEnergyConsumptionMod;
-
-    static int totalLights;
+    static float alertnessEnergyTotal;
 
     static Segment* headSegment;
     static Segment* keySegmentA;
@@ -73,8 +83,8 @@ struct Serpent
     static float anchorYPosition;
     static float anchorYPositionTarget;
 
-    static constexpr float SEGMENT_X_SEPARATION_MIN = 32;
-    static constexpr float SEGMENT_X_SEPARATION_MAX = 96;
+    static constexpr float SEGMENT_BASE_X_SEPARATION = 48;
+    static constexpr float SEGMENT_SPEED_TO_X_SEPARATION_RATIO = 28.125; // (900 max speed / 32 increased separation at max speed)
     static float segmentXSeparation;
     static float segmentXSeparationTarget;
 
@@ -92,6 +102,8 @@ struct Serpent
     static float pathYMod[MAX_SEGMENT];
     static float pathYModTarget[MAX_SEGMENT];
     static float pathSlopeMod[MAX_SEGMENT];
+
+    static int damagedSections;
 
     Serpent();
     ~Serpent();

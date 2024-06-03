@@ -13,13 +13,8 @@ Segment::~Segment()
 void Segment::Initialize()
 {
     alive = true;
-    currentLife = maxLife = 100;
-    lifeRecovery = 1;
-    accelerationContribution = 0.0;
-    maxEnergyContribution = BASE_ENERGY_CAPACITY;
-    energyProduction = 0;
-    energyConsumption = 0;
 
+    hasRepairFunction = false;
     repairFunctionActive = false;
     hasPropulsionFunction = false;
     propulsionFunctionActive = false;
@@ -38,10 +33,10 @@ void Segment::Initialize()
     xPosition = 0;
     yPosition = 0;
     rotationAngle = 0.0;
-
-    numLights = 0;
+    colour = 0;
 
     SetClassification(SEGMENT_CLASS_GENERIC);
+    isDamaged = false;
 }
 
 void Segment::SetClassification(int setting)
@@ -50,45 +45,45 @@ void Segment::SetClassification(int setting)
 
     switch(setting)
     {
+    case SEGMENT_CLASS_TAIL:
+        hasRepairFunction = true;
+        hasPropulsionFunction = true;
+        hasAlertnessFunction = true;
+        colour = 6;
+        numLights = 0;
+        break;
+
     case SEGMENT_CLASS_GENERIC:
+        colour = 7;
         numLights = 2;
         break;
 
+    case SEGMENT_CLASS_KEY:
+        hasRepairFunction = true;
+        hasPropulsionFunction = true;
+        hasAlertnessFunction = true;
+        colour = 6;
+        numLights = 3;
+        break;
+
     case SEGMENT_CLASS_HEAD:
+        hasRepairFunction = true;
         hasPropulsionFunction = true;
         hasAlertnessFunction = true;
 
         emitsGravitons = true;
-        gravitonEmissionCD = 6;
+        gravitonEmissionCD = GRAVITON_EMISSION_BASE_CD;
         gravitonBPhase = M_PI;
         gravitonBEmissionTicks = gravitonEmissionCD/2;
-        break;
-
-    case SEGMENT_CLASS_KEY:
-        hasPropulsionFunction = true;
-        hasAlertnessFunction = true;
-
-        accelerationContribution = 2;
-        numLights = 3;
-        break;
-
-    case SEGMENT_CLASS_TAIL:
-        hasPropulsionFunction = true;
-        hasAlertnessFunction = true;
-        accelerationContribution = 5;
+        colour = 6;
+        numLights = 0;
         break;
     }
 }
 
 void Segment::Update()
 {
-    currentLife += lifeRecovery/Time::FPS;
-    if(currentLife > maxLife)
-        currentLife = maxLife;
-
-    energyProduction = BASE_ENERGY_PRODUCTION;
-    energyConsumption = BASE_ENERGY_CONSUMPTION;
-
+    /*
     switch(classification)
     {
     case SEGMENT_CLASS_GENERIC:
@@ -103,7 +98,7 @@ void Segment::Update()
     case SEGMENT_CLASS_TAIL:
         break;
     }
-
+    */
 
     if(emitsGravitons)
     {
@@ -124,14 +119,14 @@ void Segment::Update()
         {
             gravitonAEmissionTicks = 0;
             Graviton*newGravitonA = new Graviton();
-            newGravitonA->Initialize(xPosition, yPosition, 3.0, rotationAngle-M_PI*0.750 + gravitonAAngleModifier);
+            newGravitonA->Initialize(xPosition, yPosition, BASE_GRAVITON_PROJECTION_VELOCITY, rotationAngle-M_PI*0.750 + gravitonAAngleModifier);
             Graviton::streamA.push_back(newGravitonA);
         }
         if(gravitonBEmissionTicks >= gravitonEmissionCD)
         {
             gravitonBEmissionTicks = 0;
             Graviton*newGravitonB = new Graviton();
-            newGravitonB->Initialize(xPosition, yPosition, 3.0, rotationAngle-M_PI*0.750 + gravitonBAngleModifier);
+            newGravitonB->Initialize(xPosition, yPosition, BASE_GRAVITON_PROJECTION_VELOCITY, rotationAngle-M_PI*0.750 + gravitonBAngleModifier);
             Graviton::streamB.push_back(newGravitonB);
         }
     }
@@ -149,6 +144,7 @@ void Segment::TogglePropulsionFunction()
 {
     if(propulsionFunctionActive)
         propulsionFunctionActive = false;
+
     else
         propulsionFunctionActive = true;
 }
@@ -159,4 +155,27 @@ void Segment::ToggleAlertnessFunction()
         alertnessFunctionActive = false;
     else
         alertnessFunctionActive = true;
+}
+
+void Segment::ChangeColour()
+{
+    colour ++;
+    if(colour >= NUM_SEGMENT_COLOURS)
+        colour = 0;
+}
+
+void Segment::EmitDamageGraviton()
+{
+    Graviton*newGraviton = new Graviton();
+    float angle = Hax::RandFloat(2*M_PI);
+    newGraviton->Initialize(xPosition, yPosition, 1.0 , angle);
+    Graviton::damageParticles.push_back(newGraviton);
+}
+
+void Segment::EmitRepairGraviton()
+{
+    Graviton*newGraviton = new Graviton();
+    float angle = Hax::RandFloat(2*M_PI);
+    newGraviton->Initialize(xPosition, yPosition, 1.0 , angle);
+    Graviton::repairParticles.push_back(newGraviton);
 }

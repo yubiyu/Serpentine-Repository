@@ -1,13 +1,16 @@
 #include "resource.h"
 
 ALLEGRO_FONT* Resource::builtin8;
+ALLEGRO_FONT* Resource::lowresPixelRegular16;
+ALLEGRO_FONT* Resource::lowresPixelRegular32;
 
 ALLEGRO_BITMAP* Resource::genericTitlePng;
 ALLEGRO_BITMAP* Resource::genericOverworldPng;
 ALLEGRO_BITMAP* Resource::genericResultsPng;
 ALLEGRO_BITMAP* Resource::genericBeingPng;
 ALLEGRO_BITMAP* Resource::genericTilePng;
-ALLEGRO_BITMAP* Resource::serpentSegmentPng[Segment::SEGMENT_CLASS_MARKER_END+1];
+ALLEGRO_BITMAP* Resource::serpentSegmentPng;
+ALLEGRO_BITMAP* Resource::serpentSegmentSubBitmap[Segment::NUM_SEGMENT_COLOURS][Segment::NUM_SEGMENT_CLASSIFICATIONS];
 ALLEGRO_BITMAP* Resource::serpentKeyLightsPng[3];
 ALLEGRO_BITMAP* Resource::serpentGenericLightsPng[2];
 ALLEGRO_BITMAP* Resource::foregroundStarPng[2];
@@ -15,10 +18,16 @@ ALLEGRO_BITMAP* Resource::centralStarPng[2];
 ALLEGRO_BITMAP* Resource::backgroundStarPng[2];
 ALLEGRO_BITMAP* Resource::farBackgroundStarPng[2];
 ALLEGRO_BITMAP* Resource::gravitonPng;
+ALLEGRO_BITMAP* Resource::gravitonGreenPng;
+ALLEGRO_BITMAP* Resource::gravitonRedPng;
 ALLEGRO_BITMAP* Resource::selectorCirclePng;
 ALLEGRO_BITMAP* Resource::propulsionButtonPng[2];
 ALLEGRO_BITMAP* Resource::repairButtonPng[2];
 ALLEGRO_BITMAP* Resource::alertnessButtonPng[2];
+ALLEGRO_BITMAP* Resource::recolourButtonPng;
+ALLEGRO_BITMAP* Resource::stationPng[3];
+ALLEGRO_BITMAP* Resource::exitStationArrowPng;
+ALLEGRO_BITMAP* Resource::nextStationArrowPng;
 
 ALLEGRO_SAMPLE* Resource::genericBgmMp3;
 ALLEGRO_SAMPLE_INSTANCE* Resource::genericBgmSampleInstance;
@@ -60,6 +69,8 @@ void Resource::Uninitialize()
 void Resource::LoadFontResources()
 {
     builtin8 = al_create_builtin_font();
+    lowresPixelRegular16 = al_load_ttf_font("LowresPixel-Regular.otf", 16, 0);
+    lowresPixelRegular32 = al_load_ttf_font("LowresPixel-Regular.otf", 32, 0);
 }
 
 void Resource::LoadImageResources()
@@ -70,13 +81,19 @@ void Resource::LoadImageResources()
     genericBeingPng = al_load_bitmap("genericBeingPng.png");
     genericTilePng = al_load_bitmap("genericTilePng.png");
 
-    serpentSegmentPng[Segment::SEGMENT_CLASS_HEAD] = al_load_bitmap("serpentHeadPng.png");
-    serpentSegmentPng[Segment::SEGMENT_CLASS_KEY] = al_load_bitmap("serpentKeyPng.png");
+    serpentSegmentPng = al_load_bitmap("serpentSegmentPng.png");
+
+    for(int y = 0; y < Segment::NUM_SEGMENT_COLOURS; y++)
+    {
+        for(int x = 0; x < Segment::NUM_SEGMENT_CLASSIFICATIONS; x++)
+        {
+            serpentSegmentSubBitmap[y][x] = al_create_sub_bitmap(serpentSegmentPng,x*64,y*64,64,64);
+        }
+    }
+
     serpentKeyLightsPng[0] = al_load_bitmap("serpentKeyOneThirdChargePng.png");
     serpentKeyLightsPng[1] = al_load_bitmap("serpentKeyTwoThirdsChargePng.png");
     serpentKeyLightsPng[2] = al_load_bitmap("serpentKeyFullChargePng.png");
-    serpentSegmentPng[Segment::SEGMENT_CLASS_TAIL] = al_load_bitmap("serpentTailPng.png");
-    serpentSegmentPng[Segment::SEGMENT_CLASS_GENERIC] = al_load_bitmap("serpentGenericPng.png");
     serpentGenericLightsPng[0] = al_load_bitmap("serpentGenericHalfChargePng.png");
     serpentGenericLightsPng[1] = al_load_bitmap("serpentGenericFullChargePng.png");
 
@@ -91,6 +108,8 @@ void Resource::LoadImageResources()
     farBackgroundStarPng[1] = al_load_bitmap("farBackgroundStar2Png.png");
 
     gravitonPng = al_load_bitmap("gravitonPng.png");
+    gravitonGreenPng = al_load_bitmap("gravitonGreenPng.png");
+    gravitonRedPng = al_load_bitmap("gravitonRedPng.png");
     selectorCirclePng = al_load_bitmap("selectorCirclePng.png");
     propulsionButtonPng[0] = al_load_bitmap("propulsionButtonPng.png");
     repairButtonPng[0] = al_load_bitmap("repairButtonPng.png");
@@ -98,6 +117,15 @@ void Resource::LoadImageResources()
     propulsionButtonPng[1] = al_load_bitmap("propulsionButtonActivePng.png");
     repairButtonPng[1] = al_load_bitmap("repairButtonActivePng.png");
     alertnessButtonPng[1] = al_load_bitmap("alertnessButtonActivePng.png");
+    recolourButtonPng = al_load_bitmap("recolourButtonPng.png");
+
+    stationPng[0] = al_load_bitmap("orangeStationPng.png");
+    stationPng[1] = al_load_bitmap("orangeStationPng.png");
+    stationPng[2] = al_load_bitmap("orangeStationPng.png");
+
+    exitStationArrowPng = al_load_bitmap("nextEventArrowPng.png");
+    nextStationArrowPng = al_load_bitmap("nextStationArrowPng.png");
+
 }
 
 void Resource::LoadAudioResources()
@@ -129,6 +157,8 @@ void Resource::LoadAudioResources()
 void Resource::UnloadFontResources()
 {
     al_destroy_font(builtin8);
+    al_destroy_font(lowresPixelRegular16);
+    al_destroy_font(lowresPixelRegular32);
 }
 
 void Resource::UnloadImageResources()
@@ -139,8 +169,15 @@ void Resource::UnloadImageResources()
     al_destroy_bitmap(genericBeingPng);
     al_destroy_bitmap(genericTilePng);
 
-    for(unsigned i = 0; i <= Segment::SEGMENT_CLASS_MARKER_END; i++)
-        al_destroy_bitmap(serpentSegmentPng[i]);
+
+    for(int y = 0; y < Segment::NUM_SEGMENT_COLOURS; y++)
+    {
+        for(int x = 0; x < Segment::NUM_SEGMENT_CLASSIFICATIONS; x++)
+        {
+            al_destroy_bitmap(serpentSegmentSubBitmap[y][x]);
+        }
+    }
+    al_destroy_bitmap(serpentSegmentPng);
 
     for(unsigned i = 0; i < 3; i++)
         al_destroy_bitmap(serpentKeyLightsPng[i]);
@@ -156,6 +193,8 @@ void Resource::UnloadImageResources()
     }
 
     al_destroy_bitmap(gravitonPng);
+    al_destroy_bitmap(gravitonGreenPng);
+    al_destroy_bitmap(gravitonRedPng);
     al_destroy_bitmap(selectorCirclePng);
 
     for(unsigned i = 0; i < 2; i++)
@@ -164,6 +203,10 @@ void Resource::UnloadImageResources()
         al_destroy_bitmap(repairButtonPng[i]);
         al_destroy_bitmap(alertnessButtonPng[i]);
     }
+    al_destroy_bitmap(recolourButtonPng);
+
+    al_destroy_bitmap(exitStationArrowPng);
+    al_destroy_bitmap(nextStationArrowPng);
 }
 
 void Resource::UnloadAudioResources()

@@ -11,7 +11,8 @@ struct UpgradeMenu
     {
         MENU_BUTTON_REPAIR,
         MENU_BUTTON_PROPULSION,
-        MENU_BUTTON_ALERTNESS
+        MENU_BUTTON_ALERTNESS,
+        MENU_BUTTON_RECOLOUR
     };
 
     static bool segmentSelected;
@@ -21,11 +22,14 @@ struct UpgradeMenu
 
     static float xPosition, yPosition;
 
-    static constexpr float REPAIR_BUTTON_X_OFFSET = 0-16;
     static constexpr float PROPULSION_BUTTON_X_OFFSET = -64-16;
+    static constexpr float REPAIR_BUTTON_X_OFFSET = 0-16;
     static constexpr float ALERTNESS_BUTTON_X_OFFSET = 64-16;
 
-    static constexpr float BUTTONS_Y_OFFSET = 160-16;
+    static constexpr float RECOLOUR_BUTTON_X_OFFSET = 0-16;
+
+    static constexpr float BUTTONS_Y_OFFSET = 96-16;
+    static constexpr float RECOLOUR_BUTTON_Y_OFFSET = -96-16;
 
     static void Initialize();
     static void Update();
